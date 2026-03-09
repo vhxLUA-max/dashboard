@@ -4,7 +4,7 @@ import { Activity } from 'lucide-react';
 
 const ExecutionDashboard = () => {
   const [supabaseUrl] = useState(process.env.REACT_APP_SUPABASE_URL || '');
-  const [apiKey] = useState(process.env.REACT_APP_SUPABASE_KEY || '');
+  const [apiKey] = useState(process.env.REACT_APP_SUPABASE_ANON_KEY || '');
   const [isConnected, setIsConnected] = useState(false);
   const [totalExecutions, setTotalExecutions] = useState(0);
   const [dailyData, setDailyData] = useState([]);
@@ -14,7 +14,7 @@ const ExecutionDashboard = () => {
 
   const fetchData = async () => {
     if (!supabaseUrl || !apiKey) {
-      setError('Supabase credentials not configured. Set REACT_APP_SUPABASE_URL and REACT_APP_SUPABASE_KEY environment variables.');
+      setError('Supabase credentials not configured. Set REACT_APP_SUPABASE_URL and REACT_APP_SUPABASE_ANON_KEY environment variables.');
       return;
     }
 
