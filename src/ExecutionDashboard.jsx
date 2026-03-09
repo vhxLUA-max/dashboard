@@ -27,7 +27,7 @@ const ExecutionDashboard = () => {
       };
 
       // Get exact total count via HEAD request (avoids row limit issues)
-      const countRes = await fetch(`${supabaseUrl}/rest/v1/executions?select=*`, {
+      const countRes = await fetch(`${supabaseUrl}/rest/v1/game_executions?select=*`, {
         method: 'HEAD',
         headers: { ...headers, 'Prefer': 'count=exact' },
       });
@@ -41,7 +41,7 @@ const ExecutionDashboard = () => {
       const pageSize = 1000;
       while (true) {
         const res = await fetch(
-          `${supabaseUrl}/rest/v1/executions?select=executed_at&offset=${from}&limit=${pageSize}`,
+          `${supabaseUrl}/rest/v1/game_executions?select=executed_at&offset=${from}&limit=${pageSize}`,
           { headers }
         );
         const page = await res.json();
