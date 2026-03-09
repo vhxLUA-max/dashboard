@@ -17,51 +17,50 @@ const ExecutionDashboard = () => {
       setError('Supabase credentials not configured. Set REACT_APP_SUPABASE_URL and REACT_APP_SUPABASE_KEY environment variables.');
       return;
     }
-    
+
     setLoading(true);
     try {
+      // FIX #2: Added missing 'apikey' header required by Supabase REST API
       const headers = {
         'Authorization': `Bearer ${apiKey}`,
+        'apikey': apiKey,
         'Content-Type': 'application/json',
       };
 
-      // Fetch all executions with executed_at timestamp
       const url = `${supabaseUrl}/rest/v1/executions?select=executed_at`;
       const res = await fetch(url, { headers });
       const data = await res.json();
 
       if (data && Array.isArray(data)) {
-        // Total count
         setTotalExecutions(data.length);
 
-        // Process daily data
+        // FIX #5: Store raw timestamp for reliable sorting instead of parsing locale strings
         const dailyGrouped = {};
         data.forEach(item => {
-          const date = new Date(item.executed_at).toLocaleDateString('en-US', { 
-            month: 'short', 
-            day: 'numeric' 
-          });
-          dailyGrouped[date] = (dailyGrouped[date] || 0) + 1;
+          const d = new Date(item.executed_at);
+          const key = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          if (!dailyGrouped[key]) dailyGrouped[key] = { count: 0, ts: d };
+          dailyGrouped[key].count++;
         });
 
         const dailyChartData = Object.entries(dailyGrouped)
-          .map(([date, count]) => ({ date, count }))
-          .sort((a, b) => new Date(a.date) - new Date(b.date))
-          .slice(-30); // Last 30 days
+          .map(([date, { count, ts }]) => ({ date, count, ts }))
+          .sort((a, b) => a.ts - b.ts)
+          .slice(-30)
+          .map(({ date, count }) => ({ date, count }));
 
         setDailyData(dailyChartData);
 
-        // Process hourly data (last 24 hours)
+        // FIX #3: Group by hour only so pre-generated keys match lookup keys
         const now = new Date();
         const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-        
+
         const hourlyGrouped = {};
         for (let i = 0; i < 24; i++) {
           const hour = new Date(oneDayAgo.getTime() + i * 60 * 60 * 1000);
-          const hourKey = hour.toLocaleTimeString('en-US', { 
-            hour: '2-digit', 
-            minute: '2-digit',
-            hour12: true 
+          const hourKey = hour.toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            hour12: true,
           });
           hourlyGrouped[hourKey] = 0;
         }
@@ -69,10 +68,9 @@ const ExecutionDashboard = () => {
         data.forEach(item => {
           const itemDate = new Date(item.executed_at);
           if (itemDate >= oneDayAgo) {
-            const hourKey = itemDate.toLocaleTimeString('en-US', { 
-              hour: '2-digit', 
-              minute: '2-digit',
-              hour12: true 
+            const hourKey = itemDate.toLocaleTimeString('en-US', {
+              hour: '2-digit',
+              hour12: true,
             });
             if (hourlyGrouped[hourKey] !== undefined) {
               hourlyGrouped[hourKey] += 1;
@@ -86,14 +84,13 @@ const ExecutionDashboard = () => {
         setHourlyData(hourlyChartData);
         setIsConnected(true);
       }
-    } catch (error) {
-      console.error('Error fetching data:', error);
+    } catch (err) {
+      console.error('Error fetching data:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  // Auto-connect on mount and refresh every 30 seconds
   useEffect(() => {
     if (supabaseUrl && apiKey) {
       fetchData();
@@ -144,9 +141,9 @@ const ExecutionDashboard = () => {
                   <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
                   <XAxis dataKey="date" stroke="#71717a" style={{ fontSize: '12px' }} />
                   <YAxis stroke="#71717a" style={{ fontSize: '12px' }} />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: '#27272a', 
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#27272a',
                       border: '1px solid #3f3f46',
                       borderRadius: '8px'
                     }}
@@ -165,18 +162,18 @@ const ExecutionDashboard = () => {
                   <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
                   <XAxis dataKey="time" stroke="#71717a" style={{ fontSize: '12px' }} />
                   <YAxis stroke="#71717a" style={{ fontSize: '12px' }} />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: '#27272a', 
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#27272a',
                       border: '1px solid #3f3f46',
                       borderRadius: '8px'
                     }}
                     labelStyle={{ color: '#fafafa' }}
                   />
-                  <Line 
-                    type="monotone" 
-                    dataKey="count" 
-                    stroke="#3b82f6" 
+                  <Line
+                    type="monotone"
+                    dataKey="count"
+                    stroke="#3b82f6"
                     dot={{ fill: '#3b82f6', r: 4 }}
                     activeDot={{ r: 6 }}
                     strokeWidth={2}
