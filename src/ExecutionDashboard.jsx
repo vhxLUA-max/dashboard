@@ -14,7 +14,7 @@ const ExecutionDashboard = () => {
 
   const fetchData = async () => {
     if (!supabaseUrl || !apiKey) {
-      setError('Supabase credentials not configured. Set REACT_APP_SUPABASE_URL and REACT_APP_SUPABASE_ANON_KEY environment variables.');
+      setError('Supabase credentials not configured.');
       return;
     }
 
@@ -26,22 +26,13 @@ const ExecutionDashboard = () => {
         'Content-Type': 'application/json',
       };
 
-      // Get exact total count via HEAD request (avoids row limit issues)
-      const countRes = await fetch(`${supabaseUrl}/rest/v1/game_executions?select=*`, {
-        method: 'HEAD',
-        headers: { ...headers, 'Prefer': 'count=exact' },
-      });
-      const contentRange = countRes.headers.get('Content-Range');
-      const total = contentRange ? parseInt(contentRange.split('/')[1]) : 0;
-      setTotalExecutions(total);
-
-      // Paginate through all rows for charts (Supabase caps at 1000 rows/page)
+      // Fetch all rows with count and last_executed_at
       let allData = [];
       let from = 0;
       const pageSize = 1000;
       while (true) {
         const res = await fetch(
-          `${supabaseUrl}/rest/v1/game_executions?select=executed_at&offset=${from}&limit=${pageSize}`,
+          `${supabaseUrl}/rest/v1/game_executions?select=count,last_executed_at&offset=${from}&limit=${pageSize}`,
           { headers }
         );
         const page = await res.json();
@@ -51,13 +42,17 @@ const ExecutionDashboard = () => {
         from += pageSize;
       }
 
-      // Process daily chart data
+      // Total = SUM of all count values
+      const total = allData.reduce((sum, row) => sum + (parseInt(row.count) || 0), 0);
+      setTotalExecutions(total);
+
+      // Daily chart: group SUM of count by day using last_executed_at
       const dailyGrouped = {};
-      allData.forEach(item => {
-        const d = new Date(item.executed_at);
+      allData.forEach(row => {
+        const d = new Date(row.last_executed_at);
         const key = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         if (!dailyGrouped[key]) dailyGrouped[key] = { count: 0, ts: d };
-        dailyGrouped[key].count++;
+        dailyGrouped[key].count += parseInt(row.count) || 0;
       });
 
       const dailyChartData = Object.entries(dailyGrouped)
@@ -68,7 +63,7 @@ const ExecutionDashboard = () => {
 
       setDailyData(dailyChartData);
 
-      // Process hourly chart data (last 24 hours)
+      // Hourly chart: group SUM of count by hour using last_executed_at
       const now = new Date();
       const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
@@ -79,12 +74,12 @@ const ExecutionDashboard = () => {
         hourlyGrouped[hourKey] = 0;
       }
 
-      allData.forEach(item => {
-        const itemDate = new Date(item.executed_at);
+      allData.forEach(row => {
+        const itemDate = new Date(row.last_executed_at);
         if (itemDate >= oneDayAgo) {
           const hourKey = itemDate.toLocaleTimeString('en-US', { hour: '2-digit', hour12: true });
           if (hourlyGrouped[hourKey] !== undefined) {
-            hourlyGrouped[hourKey] += 1;
+            hourlyGrouped[hourKey] += parseInt(row.count) || 0;
           }
         }
       });
