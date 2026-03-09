@@ -1,7 +1,0 @@
-# Supabase Configuration
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-key-here
-
-# Railway (Backend Only - DO NOT put in .env)
-# SUPABASE_SERVICE_KEY=your-service-key-here
-# PORT=3000
