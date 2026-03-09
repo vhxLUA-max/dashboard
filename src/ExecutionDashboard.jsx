@@ -20,70 +20,80 @@ const ExecutionDashboard = () => {
 
     setLoading(true);
     try {
-      // FIX #2: Added missing 'apikey' header required by Supabase REST API
       const headers = {
         'Authorization': `Bearer ${apiKey}`,
         'apikey': apiKey,
         'Content-Type': 'application/json',
       };
 
-      const url = `${supabaseUrl}/rest/v1/executions?select=executed_at`;
-      const res = await fetch(url, { headers });
-      const data = await res.json();
+      // Get exact total count via HEAD request (avoids row limit issues)
+      const countRes = await fetch(`${supabaseUrl}/rest/v1/executions?select=*`, {
+        method: 'HEAD',
+        headers: { ...headers, 'Prefer': 'count=exact' },
+      });
+      const contentRange = countRes.headers.get('Content-Range');
+      const total = contentRange ? parseInt(contentRange.split('/')[1]) : 0;
+      setTotalExecutions(total);
 
-      if (data && Array.isArray(data)) {
-        setTotalExecutions(data.length);
-
-        // FIX #5: Store raw timestamp for reliable sorting instead of parsing locale strings
-        const dailyGrouped = {};
-        data.forEach(item => {
-          const d = new Date(item.executed_at);
-          const key = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-          if (!dailyGrouped[key]) dailyGrouped[key] = { count: 0, ts: d };
-          dailyGrouped[key].count++;
-        });
-
-        const dailyChartData = Object.entries(dailyGrouped)
-          .map(([date, { count, ts }]) => ({ date, count, ts }))
-          .sort((a, b) => a.ts - b.ts)
-          .slice(-30)
-          .map(({ date, count }) => ({ date, count }));
-
-        setDailyData(dailyChartData);
-
-        // FIX #3: Group by hour only so pre-generated keys match lookup keys
-        const now = new Date();
-        const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-
-        const hourlyGrouped = {};
-        for (let i = 0; i < 24; i++) {
-          const hour = new Date(oneDayAgo.getTime() + i * 60 * 60 * 1000);
-          const hourKey = hour.toLocaleTimeString('en-US', {
-            hour: '2-digit',
-            hour12: true,
-          });
-          hourlyGrouped[hourKey] = 0;
-        }
-
-        data.forEach(item => {
-          const itemDate = new Date(item.executed_at);
-          if (itemDate >= oneDayAgo) {
-            const hourKey = itemDate.toLocaleTimeString('en-US', {
-              hour: '2-digit',
-              hour12: true,
-            });
-            if (hourlyGrouped[hourKey] !== undefined) {
-              hourlyGrouped[hourKey] += 1;
-            }
-          }
-        });
-
-        const hourlyChartData = Object.entries(hourlyGrouped)
-          .map(([time, count]) => ({ time, count }));
-
-        setHourlyData(hourlyChartData);
-        setIsConnected(true);
+      // Paginate through all rows for charts (Supabase caps at 1000 rows/page)
+      let allData = [];
+      let from = 0;
+      const pageSize = 1000;
+      while (true) {
+        const res = await fetch(
+          `${supabaseUrl}/rest/v1/executions?select=executed_at&offset=${from}&limit=${pageSize}`,
+          { headers }
+        );
+        const page = await res.json();
+        if (!Array.isArray(page) || page.length === 0) break;
+        allData = [...allData, ...page];
+        if (page.length < pageSize) break;
+        from += pageSize;
       }
+
+      // Process daily chart data
+      const dailyGrouped = {};
+      allData.forEach(item => {
+        const d = new Date(item.executed_at);
+        const key = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        if (!dailyGrouped[key]) dailyGrouped[key] = { count: 0, ts: d };
+        dailyGrouped[key].count++;
+      });
+
+      const dailyChartData = Object.entries(dailyGrouped)
+        .map(([date, { count, ts }]) => ({ date, count, ts }))
+        .sort((a, b) => a.ts - b.ts)
+        .slice(-30)
+        .map(({ date, count }) => ({ date, count }));
+
+      setDailyData(dailyChartData);
+
+      // Process hourly chart data (last 24 hours)
+      const now = new Date();
+      const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+      const hourlyGrouped = {};
+      for (let i = 0; i < 24; i++) {
+        const hour = new Date(oneDayAgo.getTime() + i * 60 * 60 * 1000);
+        const hourKey = hour.toLocaleTimeString('en-US', { hour: '2-digit', hour12: true });
+        hourlyGrouped[hourKey] = 0;
+      }
+
+      allData.forEach(item => {
+        const itemDate = new Date(item.executed_at);
+        if (itemDate >= oneDayAgo) {
+          const hourKey = itemDate.toLocaleTimeString('en-US', { hour: '2-digit', hour12: true });
+          if (hourlyGrouped[hourKey] !== undefined) {
+            hourlyGrouped[hourKey] += 1;
+          }
+        }
+      });
+
+      const hourlyChartData = Object.entries(hourlyGrouped)
+        .map(([time, count]) => ({ time, count }));
+
+      setHourlyData(hourlyChartData);
+      setIsConnected(true);
     } catch (err) {
       console.error('Error fetching data:', err);
     } finally {
@@ -120,7 +130,6 @@ const ExecutionDashboard = () => {
           </div>
 
           <div className="grid grid-cols-1 gap-8">
-            {/* Total Executions Card */}
             <div className="bg-gradient-to-br from-zinc-800 to-zinc-850 border border-zinc-700 rounded-xl p-8">
               <div className="flex items-start justify-between">
                 <div>
@@ -133,7 +142,6 @@ const ExecutionDashboard = () => {
               </div>
             </div>
 
-            {/* Daily Chart */}
             <div className="bg-gradient-to-br from-zinc-800 to-zinc-850 border border-zinc-700 rounded-xl p-8">
               <h2 className="text-lg font-light text-white mb-6">Daily Executions (Last 30 Days)</h2>
               <ResponsiveContainer width="100%" height={350}>
@@ -142,11 +150,7 @@ const ExecutionDashboard = () => {
                   <XAxis dataKey="date" stroke="#71717a" style={{ fontSize: '12px' }} />
                   <YAxis stroke="#71717a" style={{ fontSize: '12px' }} />
                   <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#27272a',
-                      border: '1px solid #3f3f46',
-                      borderRadius: '8px'
-                    }}
+                    contentStyle={{ backgroundColor: '#27272a', border: '1px solid #3f3f46', borderRadius: '8px' }}
                     labelStyle={{ color: '#fafafa' }}
                   />
                   <Bar dataKey="count" fill="#3b82f6" radius={[8, 8, 0, 0]} />
@@ -154,7 +158,6 @@ const ExecutionDashboard = () => {
               </ResponsiveContainer>
             </div>
 
-            {/* Hourly Chart */}
             <div className="bg-gradient-to-br from-zinc-800 to-zinc-850 border border-zinc-700 rounded-xl p-8">
               <h2 className="text-lg font-light text-white mb-6">Hourly Executions (Last 24 Hours)</h2>
               <ResponsiveContainer width="100%" height={350}>
@@ -163,11 +166,7 @@ const ExecutionDashboard = () => {
                   <XAxis dataKey="time" stroke="#71717a" style={{ fontSize: '12px' }} />
                   <YAxis stroke="#71717a" style={{ fontSize: '12px' }} />
                   <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#27272a',
-                      border: '1px solid #3f3f46',
-                      borderRadius: '8px'
-                    }}
+                    contentStyle={{ backgroundColor: '#27272a', border: '1px solid #3f3f46', borderRadius: '8px' }}
                     labelStyle={{ color: '#fafafa' }}
                   />
                   <Line
@@ -182,7 +181,6 @@ const ExecutionDashboard = () => {
               </ResponsiveContainer>
             </div>
 
-            {/* Refresh Button */}
             <div className="flex justify-center">
               <button
                 onClick={fetchData}
