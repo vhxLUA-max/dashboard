@@ -98,7 +98,7 @@ const ExecutionDashboard = () => {
       const interval = setInterval(fetchData, 30000);
       return () => clearInterval(interval);
     }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950">
