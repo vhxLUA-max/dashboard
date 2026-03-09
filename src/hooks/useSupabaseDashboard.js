@@ -7,13 +7,11 @@ export const useSupabaseDashboard = (dateRange = '7d') => {
   const [error, setError] = useState(null)
   const [realtimeExecutions, setRealtimeExecutions] = useState([])
 
-  // Fetch initial data
   const fetchData = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
 
-      // Calculate date range
       const rangeMap = {
         '24h': 1,
         '7d': 7,
@@ -24,7 +22,6 @@ export const useSupabaseDashboard = (dateRange = '7d') => {
       const startDate = new Date()
       startDate.setDate(startDate.getDate() - days)
 
-      // Get executions
       const { data: executions, error: execError } = await supabase
         .from('executions')
         .select('*')
@@ -33,7 +30,6 @@ export const useSupabaseDashboard = (dateRange = '7d') => {
 
       if (execError) throw execError
 
-      // Calculate metrics
       const total = executions.length
       const successful = executions.filter(e => e.status === 'success').length
       const failed = executions.filter(e => e.status === 'failed').length
@@ -42,14 +38,7 @@ export const useSupabaseDashboard = (dateRange = '7d') => {
         ? (executions.reduce((acc, e) => acc + (e.duration_ms || 0), 0) / total).toFixed(0)
         : 0
 
-      // Get unique users
       const uniqueUsers = [...new Set(executions.map(e => e.user_id))].length
-
-      // Daily breakdown for charts
-      const dailyData = getDailyBreakdown(executions, days)
-
-      // Hourly distribution
-      const hourlyData = getHourlyDistribution(executions)
 
       setData({
         totalExecutions: total,
@@ -58,8 +47,6 @@ export const useSupabaseDashboard = (dateRange = '7d') => {
         avgDuration: `${(avgDuration / 1000).toFixed(1)}s`,
         successful,
         failed,
-        dailyData,
-        hourlyData,
         recentExecutions: executions.slice(0, 10).map(e => ({
           id: e.id,
           user: e.username || e.user_id?.slice(0, 8) || 'Unknown',
@@ -76,35 +63,22 @@ export const useSupabaseDashboard = (dateRange = '7d') => {
     }
   }, [dateRange])
 
-  // Real-time subscription
   useEffect(() => {
     fetchData()
 
-    // Subscribe to changes
     const subscription = supabase
       .channel('executions_channel')
       .on(
         'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'executions'
-        },
+        { event: 'INSERT', schema: 'public', table: 'executions' },
         (payload) => {
-          const newExecution = payload.new
-          
-          // Add to realtime list
-          setRealtimeExecutions(prev => [newExecution, ...prev].slice(0, 5))
-          
-          // Refresh data
+          setRealtimeExecutions(prev => [payload.new, ...prev].slice(0, 5))
           fetchData()
         }
       )
       .subscribe()
 
-    return () => {
-      subscription.unsubscribe()
-    }
+    return () => subscription.unsubscribe()
   }, [fetchData])
 
   const insertExecution = async (executionData) => {
@@ -117,50 +91,12 @@ export const useSupabaseDashboard = (dateRange = '7d') => {
     return data
   }
 
-  return {
-    data,
-    loading,
-    error,
-    realtimeExecutions,
-    refresh: fetchData,
-    insertExecution
-  }
-}
-
-// Helper functions
-function getDailyBreakdown(executions, days) {
-  const data = []
-  for (let i = days - 1; i >= 0; i--) {
-    const date = new Date()
-    date.setDate(date.getDate() - i)
-    const dateStr = date.toISOString().split('T')[0]
-    
-    const dayExecs = executions.filter(e => 
-      e.created_at.startsWith(dateStr)
-    )
-    
-    data.push({
-      date: dateStr,
-      successful: dayExecs.filter(e => e.status === 'success').length,
-      failed: dayExecs.filter(e => e.status === 'failed').length
-    })
-  }
-  return data
-}
-
-function getHourlyDistribution(executions) {
-  const hours = Array(24).fill(0)
-  executions.forEach(e => {
-    const hour = new Date(e.created_at).getHours()
-    hours[hour]++
-  })
-  return hours.map((count, hour) => ({ hour, count }))
+  return { data, loading, error, realtimeExecutions, refresh: fetchData, insertExecution }
 }
 
 function formatRelativeTime(dateString) {
   const date = new Date(dateString)
   const seconds = Math.floor((new Date() - date) / 1000)
-  
   if (seconds < 60) return 'just now'
   const minutes = Math.floor(seconds / 60)
   if (minutes < 60) return `${minutes}m ago`
