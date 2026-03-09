@@ -1,5 +1,5 @@
 import React from 'react';
-import ExecutionDashboard from './components/ExecutionDashboard';
+import ExecutionDashboard from './ExecutionDashboard';
 import './App.css';
 
 function App() {
