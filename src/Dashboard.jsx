@@ -1,111 +1,134 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Activity, 
-  Users, 
-  Clock, 
-  CheckCircle, 
-  XCircle, 
-  TrendingUp,
-  Zap
-} from 'lucide-react';
-import Layout from './components/Layout/Layout';
-import MetricCard from './components/Dashboard/MetricCard';
-import EmptyState from './components/Dashboard/EmptyState';
-import DateRangePicker from './components/common/DateRangePicker';
-import { SkeletonCard, SkeletonChart } from './components/common/LoadingSpinner';
+import React, { useState } from 'react'
+import { Activity, Users, Clock, CheckCircle, XCircle, Zap, Plus, RefreshCw } from 'lucide-react'
+import { useSupabaseDashboard } from './hooks/useSupabaseDashboard'
 
-// Mock data generator - replace with your actual API calls
-const generateMockData = () => ({
-  totalExecutions: 1247,
-  uniqueUsers: 89,
-  successRate: 94.5,
-  avgDuration: '2.3s',
-  growth: '+12.5%',
-  recentExecutions: [
-    { id: 1, user: 'john@example.com', status: 'success', time: '2 min ago', duration: '1.2s' },
-    { id: 2, user: 'sarah@example.com', status: 'failed', time: '5 min ago', duration: '3.1s' },
-    { id: 3, user: 'mike@example.com', status: 'success', time: '12 min ago', duration: '0.8s' },
-  ]
-});
-
-const Dashboard = () => {
-  const [loading, setLoading] = useState(true);
-  const [data, setData] = useState(null);
-  const [dateRange, setDateRange] = useState('7d');
-  const [hasData, setHasData] = useState(false);
-
-  useEffect(() => {
-    // Simulate API call
-    const fetchData = async () => {
-      setLoading(true);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      const mockData = generateMockData();
-      setData(mockData);
-      setHasData(mockData.totalExecutions > 0);
-      setLoading(false);
-    };
-
-    fetchData();
-  }, [dateRange]);
-
-  const metrics = [
-    {
-      title: 'Total Executions',
-      value: data?.totalExecutions?.toLocaleString() || '0',
-      subtitle: 'All time executions',
-      trend: 'up',
-      trendValue: data?.growth || '0%',
-      icon: Zap,
-      color: 'blue'
-    },
-    {
-      title: 'Unique Users',
-      value: data?.uniqueUsers?.toString() || '0',
-      subtitle: 'Active this month',
-      trend: 'up',
-      trendValue: '+5.2%',
-      icon: Users,
-      color: 'purple'
-    },
-    {
-      title: 'Success Rate',
-      value: `${data?.successRate || 0}%`,
-      subtitle: 'Last 30 days',
-      trend: 'up',
-      trendValue: '+2.1%',
-      icon: CheckCircle,
-      color: 'green'
-    },
-    {
-      title: 'Avg Duration',
-      value: data?.avgDuration || '0s',
-      subtitle: 'Per execution',
-      trend: 'down',
-      trendValue: '-0.3s',
-      icon: Clock,
-      color: 'orange'
-    }
-  ];
+// Components (create these or inline them)
+const MetricCard = ({ title, value, subtitle, icon: Icon, color }) => {
+  const colors = {
+    blue: 'from-blue-500 to-blue-600',
+    green: 'from-emerald-500 to-emerald-600',
+    purple: 'from-purple-500 to-purple-600',
+    orange: 'from-orange-500 to-orange-600'
+  }
 
   return (
-    <Layout>
-      {/* Header Section */}
+    <div className="rounded-2xl bg-gray-900 border border-gray-800 p-6 hover:border-gray-700 transition-all">
+      <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${colors[color]} bg-opacity-20 flex items-center justify-center mb-4`}>
+        <Icon size={24} className="text-white" />
+      </div>
+      <h3 className="text-gray-400 text-sm mb-1">{title}</h3>
+      <div className="text-3xl font-bold text-white mb-1">{value}</div>
+      <p className="text-gray-500 text-sm">{subtitle}</p>
+    </div>
+  )
+}
+
+const EmptyState = ({ onAction }) => (
+  <div className="flex flex-col items-center justify-center py-16 text-center">
+    <div className="w-20 h-20 rounded-2xl bg-gray-800 flex items-center justify-center mb-4">
+      <Activity size={32} className="text-gray-400" />
+    </div>
+    <h3 className="text-xl font-semibold text-white mb-2">No executions yet</h3>
+    <p className="text-gray-400 mb-6">Start by creating a test execution</p>
+    <button
+      onClick={onAction}
+      className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-medium transition-colors"
+    >
+      <Plus size={20} />
+      Create Test Execution
+    </button>
+  </div>
+)
+
+function App() {
+  const [dateRange, setDateRange] = useState('7d')
+  const { data, loading, error, realtimeExecutions, refresh, insertExecution } = useSupabaseDashboard(dateRange)
+
+  const handleTestExecution = async () => {
+    try {
+      await insertExecution({
+        username: 'test-user',
+        status: Math.random() > 0.3 ? 'success' : 'failed',
+        duration_ms: Math.floor(Math.random() * 5000),
+        metadata: { test: true }
+      })
+    } catch (err) {
+      alert('Error: ' + err.message)
+    }
+  }
+
+  const metrics = [
+    { title: 'Total Executions', value: data?.totalExecutions || 0, subtitle: 'All time', icon: Zap, color: 'blue' },
+    { title: 'Unique Users', value: data?.uniqueUsers || 0, subtitle: 'Active users', icon: Users, color: 'purple' },
+    { title: 'Success Rate', value: `${data?.successRate || 0}%`, subtitle: `${data?.successful || 0} passed`, icon: CheckCircle, color: 'green' },
+    { title: 'Avg Duration', value: data?.avgDuration || '0s', subtitle: 'Per execution', icon: Clock, color: 'orange' }
+  ]
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center">
+        <div className="text-center">
+          <XCircle size={48} className="text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold mb-2">Connection Error</h2>
+          <p className="text-gray-400 mb-4">{error}</p>
+          <button 
+            onClick={refresh}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg mx-auto"
+          >
+            <RefreshCw size={16} />
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-950 text-white p-8">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
-          <h2 className="text-2xl font-bold text-white mb-1">Dashboard Overview</h2>
-          <p className="text-gray-400">Monitor your execution metrics and performance</p>
+          <h1 className="text-3xl font-bold mb-1">Dashboard</h1>
+          <p className="text-gray-400">Monitor your executions in real-time</p>
         </div>
-        <DateRangePicker value={dateRange} onChange={setDateRange} />
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleTestExecution}
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg font-medium transition-colors"
+          >
+            <Plus size={18} />
+            Test Execution
+          </button>
+          <select 
+            value={dateRange} 
+            onChange={(e) => setDateRange(e.target.value)}
+            className="px-4 py-2 bg-gray-900 border border-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="24h">Last 24 hours</option>
+            <option value="7d">Last 7 days</option>
+            <option value="30d">Last 30 days</option>
+            <option value="90d">Last 90 days</option>
+          </select>
+        </div>
       </div>
 
-      {/* Metrics Grid */}
+      {/* Real-time indicator */}
+      {realtimeExecutions.length > 0 && (
+        <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-3">
+          <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+          <span className="text-emerald-400">
+            {realtimeExecutions.length} new execution{realtimeExecutions.length > 1 ? 's' : ''}
+          </span>
+        </div>
+      )}
+
+      {/* Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {loading ? (
           <>
-            <SkeletonCard />
-            <SkeletonCard />
-            <SkeletonCard />
-            <SkeletonCard />
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-32 bg-gray-900 rounded-2xl animate-pulse" />
+            ))}
           </>
         ) : (
           metrics.map((metric, index) => (
@@ -114,152 +137,66 @@ const Dashboard = () => {
         )}
       </div>
 
-      {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        {/* Main Chart */}
+      {/* Main Content */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Chart Area */}
         <div className="lg:col-span-2 rounded-2xl bg-gray-900 border border-gray-800 p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-white">Execution Trends</h3>
-            <div className="flex items-center gap-2">
-              <span className="flex items-center gap-1 text-sm text-gray-400">
-                <span className="w-2 h-2 rounded-full bg-blue-500" />
-                Successful
-              </span>
-              <span className="flex items-center gap-1 text-sm text-gray-400">
-                <span className="w-2 h-2 rounded-full bg-red-500" />
-                Failed
-              </span>
-            </div>
-          </div>
+          <h3 className="text-lg font-semibold mb-6">Recent Activity</h3>
           
           {loading ? (
-            <SkeletonChart />
-          ) : !hasData ? (
-            <EmptyState 
-              title="No execution data"
-              description="Start running executions to see trends and analytics here."
-              actionLabel="Run First Execution"
-              onAction={() => console.log('Run execution')}
-            />
+            <div className="h-64 bg-gray-800 rounded-xl animate-pulse" />
+          ) : data?.recentExecutions?.length === 0 ? (
+            <EmptyState onAction={handleTestExecution} />
           ) : (
-            <div className="h-64 flex items-end gap-2">
-              {/* Replace with your actual chart library (recharts, chart.js, etc.) */}
-              {[...Array(30)].map((_, i) => {
-                const height = Math.random() * 60 + 20;
-                return (
-                  <div key={i} className="flex-1 flex flex-col gap-1 group cursor-pointer">
-                    <div 
-                      className="w-full bg-blue-600/80 rounded-t-sm hover:bg-blue-500 transition-colors relative"
-                      style={{ height: `${height}%` }}
-                    >
-                      <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                        {Math.floor(Math.random() * 100)} executions
-                      </div>
-                    </div>
-                    <div 
-                      className="w-full bg-red-500/60 rounded-t-sm hover:bg-red-400 transition-colors"
-                      style={{ height: `${height * 0.2}%` }}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Recent Activity */}
-        <div className="rounded-2xl bg-gray-900 border border-gray-800 p-6">
-          <h3 className="text-lg font-semibold text-white mb-6">Recent Activity</h3>
-          
-          {loading ? (
-            <div className="space-y-4">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="flex items-center gap-3 animate-pulse">
-                  <div className="w-10 h-10 rounded-full bg-gray-800" />
-                  <div className="flex-1">
-                    <div className="w-32 h-4 rounded bg-gray-800 mb-2" />
-                    <div className="w-20 h-3 rounded bg-gray-800" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : !hasData ? (
-            <EmptyState 
-              title="No recent activity"
-              description="Recent executions will appear here."
-              icon={Activity}
-            />
-          ) : (
-            <div className="space-y-4">
-              {data?.recentExecutions?.map((execution) => (
+            <div className="space-y-3">
+              {data.recentExecutions.map((execution) => (
                 <div 
                   key={execution.id} 
-                  className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-800/50 transition-colors group cursor-pointer"
+                  className="flex items-center gap-4 p-4 bg-gray-800/50 rounded-xl hover:bg-gray-800 transition-colors"
                 >
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
                     execution.status === 'success' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'
                   }`}>
                     {execution.status === 'success' ? <CheckCircle size={20} /> : <XCircle size={20} />}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-white truncate group-hover:text-blue-400 transition-colors">
-                      {execution.user}
-                    </p>
-                    <p className="text-xs text-gray-500">{execution.time} • {execution.duration}</p>
+                  <div className="flex-1">
+                    <p className="font-medium">{execution.user}</p>
+                    <p className="text-sm text-gray-400">{execution.time} • {execution.duration}</p>
                   </div>
-                  <div className={`text-xs font-medium px-2 py-1 rounded-full ${
+                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                     execution.status === 'success' 
                       ? 'bg-emerald-500/10 text-emerald-400' 
                       : 'bg-red-500/10 text-red-400'
                   }`}>
                     {execution.status}
-                  </div>
+                  </span>
                 </div>
               ))}
-              
-              <button className="w-full py-3 text-sm text-blue-400 hover:text-blue-300 font-medium hover:bg-blue-500/10 rounded-xl transition-colors">
-                View all executions →
-              </button>
             </div>
           )}
         </div>
-      </div>
 
-      {/* Hourly Distribution */}
-      <div className="rounded-2xl bg-gray-900 border border-gray-800 p-6">
-        <h3 className="text-lg font-semibold text-white mb-6">Hourly Distribution (24h)</h3>
-        {loading ? (
-          <SkeletonChart />
-        ) : !hasData ? (
-          <EmptyState 
-            title="No hourly data"
-            description="Execution patterns by hour will appear here once you have data."
-            icon={Clock}
-          />
-        ) : (
-          <div className="h-48 flex items-end gap-1">
-            {[...Array(24)].map((_, i) => {
-              const height = Math.random() * 80 + 10;
-              const isPeak = height > 70;
-              return (
-                <div key={i} className="flex-1 flex flex-col items-center gap-1 group">
-                  <div 
-                    className={`w-full rounded-t transition-all duration-300 ${
-                      isPeak ? 'bg-purple-500' : 'bg-gray-700 hover:bg-gray-600'
-                    }`}
-                    style={{ height: `${height}%` }}
-                  />
-                  <span className="text-[10px] text-gray-600 group-hover:text-gray-400">
-                    {i}:00
-                  </span>
-                </div>
-              );
-            })}
+        {/* Stats */}
+        <div className="rounded-2xl bg-gray-900 border border-gray-800 p-6">
+          <h3 className="text-lg font-semibold mb-6">Quick Stats</h3>
+          <div className="space-y-4">
+            <div className="flex justify-between items-center p-4 bg-gray-800/50 rounded-xl">
+              <span className="text-gray-400">Success Rate</span>
+              <span className="text-2xl font-bold text-emerald-400">{data?.successRate || 0}%</span>
+            </div>
+            <div className="flex justify-between items-center p-4 bg-gray-800/50 rounded-xl">
+              <span className="text-gray-400">Failed</span>
+              <span className="text-2xl font-bold text-red-400">{data?.failed || 0}</span>
+            </div>
+            <div className="flex justify-between items-center p-4 bg-gray-800/50 rounded-xl">
+              <span className="text-gray-400">Total</span>
+              <span className="text-2xl font-bold text-white">{data?.totalExecutions || 0}</span>
+            </div>
           </div>
-        )}
+        </div>
       </div>
-    </Layout>
-  );
-};
+    </div>
+  )
+}
 
-export default Dashboard;
+export default App
