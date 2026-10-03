@@ -47,7 +47,6 @@ function role_permissions(): array
             'permissions.view',
             'permissions.manage',
             'releases.view',
-            'releases.manage',
             'settings.view',
             'settings.manage',
             'health.view',
@@ -215,7 +214,7 @@ function permission_catalog(): array
         'Devices' => ['devices.view', 'devices.manage'],
         'Activity logs' => ['logs.view'],
         'Permissions' => ['permissions.view', 'permissions.manage'],
-        'Releases' => ['releases.view', 'releases.manage'],
+        'Releases' => ['releases.view'],
         'Settings' => ['settings.view', 'settings.manage'],
         'System health' => ['health.view'],
     ];
