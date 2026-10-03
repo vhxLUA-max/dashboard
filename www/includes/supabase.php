@@ -232,14 +232,14 @@ function get_subscription_events(string $subscriptionId): array
 function get_devices(): array
 {
     return supabase_request(
-        'devices?select=id,account_id,device_uid,device_name,app_version,os_version,first_seen_at,last_seen_at,revoked_at,notes,created_at,updated_at,account:secondary_accounts(id,username,discord_user_id)&order=last_seen_at.desc.nullslast,created_at.desc'
+        'devices?select=id,account_id,device_uid,device_name,app_version,os_version,first_seen_at,last_seen_at,revoked_at,last_ip,notes,created_at,updated_at,account:secondary_accounts(id,username,discord_user_id)&order=last_seen_at.desc.nullslast,created_at.desc'
     );
 }
 
 function get_device(string $id): ?array
 {
     $rows = supabase_request(
-        'devices?select=id,account_id,device_uid,device_name,app_version,os_version,first_seen_at,last_seen_at,revoked_at,notes,created_at,updated_at,account:secondary_accounts(id,username,discord_user_id)&' .
+        'devices?select=id,account_id,device_uid,device_name,app_version,os_version,first_seen_at,last_seen_at,revoked_at,last_ip,notes,created_at,updated_at,account:secondary_accounts(id,username,discord_user_id)&' .
         supabase_id_filter('id', $id) . '&limit=1'
     );
 
