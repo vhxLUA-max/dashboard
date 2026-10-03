@@ -5,8 +5,7 @@ create table if not exists public.admin_users (
     role text not null default 'viewer' check (role in ('owner','administrator','support','viewer')),
     enabled boolean not null default true,
     created_at timestamptz not null default now(),
-    updated_at timestamptz not null default now(),
-    last_ip text
+    updated_at timestamptz not null default now()
 );
 
 create table if not exists public.subscription_plans (
@@ -62,7 +61,8 @@ create table if not exists public.devices (
     revoked_at timestamptz,
     notes text,
     created_at timestamptz not null default now(),
-    updated_at timestamptz not null default now()
+    updated_at timestamptz not null default now(),
+    last_ip text
 );
 
 create table if not exists public.activity_logs (
