@@ -26,6 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $errorMessage = 'Invalid username or password.';
             } else {
                 login_admin($admin);
+                try { create_activity_log('admin.login', 'admin', (string) ($admin['id'] ?? '')); } catch (Throwable) {}
                 flash('success', 'Signed in successfully.');
                 redirect_to($next);
             }
