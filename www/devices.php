@@ -10,74 +10,155 @@ require_once __DIR__ . '/includes/supabase.php';
 $pageTitle = 'Devices';
 $currentPage = 'devices';
 $devices = [];
-$accounts = [];
-$editing = null;
 $errorMessage = null;
 
-try { $devices = get_devices(); } catch (Throwable $e) { $errorMessage = $e->getMessage(); }
-try { $accounts = get_secondary_accounts(); } catch (Throwable $e) { $errorMessage ??= $e->getMessage(); }
-
-$editId = query_string('edit');
-if ($editId !== '') {
-    try { $editing = get_device($editId); } catch (Throwable $e) { $errorMessage ??= $e->getMessage(); }
+try {
+    $devices = get_devices();
+} catch (Throwable $e) {
+    $errorMessage = $e->getMessage();
 }
 
-$active = count(array_filter($devices, static fn (array $device): bool => empty($device['revoked_at'])));
-$revoked = count($devices) - $active;
+$now = new DateTimeImmutable('now');
+$onlineCutoff = $now->modify('-2 minutes');
+
+$online = 0;
+$offline = 0;
+$revoked = 0;
+
+foreach ($devices as $device) {
+    if (!empty($device['revoked_at'])) {
+        $revoked++;
+        continue;
+    }
+
+    try {
+        $lastSeen = !empty($device['last_seen_at'])
+            ? new DateTimeImmutable((string) $device['last_seen_at'])
+            : null;
+    } catch (Throwable) {
+        $lastSeen = null;
+    }
+
+    if ($lastSeen && $lastSeen >= $onlineCutoff) {
+        $online++;
+    } else {
+        $offline++;
+    }
+}
 
 require __DIR__ . '/includes/header.php';
 ?>
 <div class="page-header">
-    <div><div class="eyebrow">HARDWARE</div><h1>Devices</h1><p class="page-subtitle">Track registered Solis installations and revoke access.</p></div>
-</div>
-<?php if ($errorMessage !== null): ?><div class="alert alert-warning"><?= e($errorMessage) ?></div><?php endif; ?>
-
-<section class="stats-grid">
-    <article class="stat-card"><div class="stat-label">Registered</div><div class="stat-value"><?= count($devices) ?></div><div class="stat-note">Known devices</div></article>
-    <article class="stat-card"><div class="stat-label">Active</div><div class="stat-value"><?= $active ?></div><div class="stat-note">Not revoked</div></article>
-    <article class="stat-card"><div class="stat-label">Revoked</div><div class="stat-value"><?= $revoked ?></div><div class="stat-note">Access disabled</div></article>
-    <article class="stat-card"><div class="stat-label">Recently seen</div><div class="stat-value"><?= count(array_filter($devices, static fn (array $device): bool => !empty($device['last_seen_at']) && strtotime((string) $device['last_seen_at']) >= strtotime('-7 days'))) ?></div><div class="stat-note">Seen within 7 days</div></article>
-</section>
-
-<div class="grid-2">
-<?php if (admin_has_permission('devices.manage')): ?>
-<section class="panel">
-    <div class="panel-header"><div><div class="eyebrow"><?= $editing ? 'EDIT DEVICE' : 'REGISTER DEVICE' ?></div><h2><?= $editing ? e($editing['device_name'] ?: $editing['device_uid']) : 'Add device' ?></h2></div><?php if ($editing): ?><a class="button" href="devices.php">New</a><?php endif; ?></div>
-    <div class="panel-body">
-        <form class="form-stack" method="post" action="actions.php">
-            <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
-            <input type="hidden" name="action" value="device_save">
-            <input type="hidden" name="id" value="<?= e($editing['id'] ?? '') ?>">
-            <input type="hidden" name="return_to" value="devices.php">
-            <label><span>User</span><select name="account_id" required><option value="">Select user</option><?php foreach ($accounts as $account): ?><option value="<?= e($account['id']) ?>" <?= (string) ($editing['account_id'] ?? '') === (string) $account['id'] ? 'selected' : '' ?>><?= e($account['username']) ?></option><?php endforeach; ?></select></label>
-            <label><span>Device ID</span><input type="text" name="device_uid" value="<?= e($editing['device_uid'] ?? '') ?>" required></label>
-            <label><span>Device name</span><input type="text" name="device_name" value="<?= e($editing['device_name'] ?? '') ?>" placeholder="Home PC"></label>
-            <div class="form-grid"><label><span>Solis version</span><input type="text" name="app_version" value="<?= e($editing['app_version'] ?? '') ?>" placeholder="5.9.3"></label><label><span>Windows version</span><input type="text" name="os_version" value="<?= e($editing['os_version'] ?? '') ?>" placeholder="Windows 11"></label></div>
-            <label><span>Last seen</span><input type="datetime-local" name="last_seen_at" value="<?= e(datetime_local_value($editing['last_seen_at'] ?? null)) ?>"></label>
-            <label><span>Notes</span><textarea name="notes" rows="3"><?= e($editing['notes'] ?? '') ?></textarea></label>
-            <button class="button primary" type="submit"><?= $editing ? 'Save device' : 'Add device' ?></button>
-        </form>
+    <div>
+        <div class="eyebrow">HARDWARE</div>
+        <h1>Devices</h1>
+        <p class="page-subtitle">Automatically detected Solis installations. Device records are created and refreshed by Solis.</p>
     </div>
-</section>
+</div>
+
+<?php if ($errorMessage !== null): ?>
+    <div class="alert alert-warning"><?= e($errorMessage) ?></div>
 <?php endif; ?>
 
-<section class="panel">
-    <div class="panel-header"><div><div class="eyebrow">REGISTRY</div><h2>Devices</h2></div></div>
-    <div class="table-wrap"><table><thead><tr><th>User</th><th>Device</th><th>Solis</th><th>OS</th><th>Last seen</th><th>Status</th><th></th></tr></thead><tbody>
-    <?php foreach ($devices as $device): ?>
-        <?php $status = !empty($device['revoked_at']) ? 'revoked' : 'active'; ?>
-        <tr>
-            <td><?= e($device['account']['username'] ?? 'Unknown') ?></td>
-            <td><strong><?= e($device['device_name'] ?: $device['device_uid']) ?></strong><div class="muted tiny"><?= e($device['device_uid']) ?></div></td>
-            <td><?= e($device['app_version'] ?: '—') ?></td>
-            <td><?= e($device['os_version'] ?: '—') ?></td>
-            <td><?= e(format_date($device['last_seen_at'])) ?></td>
-            <td><?= badge_html($status) ?></td>
-            <td class="actions"><?php if (admin_has_permission('devices.manage')): ?><a class="button small" href="devices.php?edit=<?= e($device['id']) ?>">Edit</a><?php if ($status === 'active'): ?><form method="post" action="actions.php"><input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>"><input type="hidden" name="action" value="device_revoke"><input type="hidden" name="id" value="<?= e($device['id']) ?>"><input type="hidden" name="return_to" value="devices.php"><button class="button small" type="submit">Revoke</button></form><?php else: ?><form method="post" action="actions.php"><input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>"><input type="hidden" name="action" value="device_restore"><input type="hidden" name="id" value="<?= e($device['id']) ?>"><input type="hidden" name="return_to" value="devices.php"><button class="button small" type="submit">Restore</button></form><?php endif; ?><form method="post" action="actions.php" onsubmit="return confirm('Delete this device?');"><input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>"><input type="hidden" name="action" value="device_delete"><input type="hidden" name="id" value="<?= e($device['id']) ?>"><input type="hidden" name="return_to" value="devices.php"><button class="button small danger" type="submit">Delete</button></form><?php endif; ?></td>
-        </tr>
-    <?php endforeach; ?>
-    <?php if ($devices === []): ?><tr><td colspan="7"><div class="empty-table">No devices registered yet.</div></td></tr><?php endif; ?>
-    </tbody></table></div>
+<section class="stats-grid">
+    <article class="stat-card"><div class="stat-label">Registered</div><div class="stat-value"><?= count($devices) ?></div><div class="stat-note">Detected installations</div></article>
+    <article class="stat-card"><div class="stat-label">Online</div><div class="stat-value"><?= $online ?></div><div class="stat-note">Seen within 2 minutes</div></article>
+    <article class="stat-card"><div class="stat-label">Offline</div><div class="stat-value"><?= $offline ?></div><div class="stat-note">No heartbeat within 2 minutes</div></article>
+    <article class="stat-card"><div class="stat-label">Revoked</div><div class="stat-value"><?= $revoked ?></div><div class="stat-note">Blocked installations</div></article>
 </section>
-</div>
+
+<section class="panel">
+    <div class="panel-header">
+        <div><div class="eyebrow">AUTOMATIC REGISTRY</div><h2>Detected devices</h2></div>
+        <div class="toolbar-note">Solis heartbeat: every 30 seconds</div>
+    </div>
+
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Device ID</th>
+                    <th>Solis Version</th>
+                    <th>Windows Version</th>
+                    <th>Last Seen</th>
+                    <th>First Seen</th>
+                    <th>User</th>
+                    <th>Status</th>
+                    <th>Last IP</th>
+                    <?php if (admin_has_permission('devices.manage')): ?><th></th><?php endif; ?>
+                </tr>
+            </thead>
+            <tbody>
+            <?php foreach ($devices as $device): ?>
+                <?php
+                $isRevoked = !empty($device['revoked_at']);
+                try {
+                    $lastSeen = !empty($device['last_seen_at']) ? new DateTimeImmutable((string) $device['last_seen_at']) : null;
+                } catch (Throwable) {
+                    $lastSeen = null;
+                }
+                $status = $isRevoked ? 'revoked' : (($lastSeen && $lastSeen >= $onlineCutoff) ? 'online' : 'offline');
+                ?>
+                <tr>
+                    <td><code><?= e($device['device_uid']) ?></code></td>
+                    <td><?= e($device['app_version'] ?: '—') ?></td>
+                    <td><?= e($device['os_version'] ?: '—') ?></td>
+                    <td><?= e(format_date($device['last_seen_at'])) ?></td>
+                    <td><?= e(format_date($device['first_seen_at'])) ?></td>
+                    <td>
+                        <?php if (!empty($device['account']['id'])): ?>
+                            <a class="table-link" href="user.php?id=<?= e($device['account']['id']) ?>"><?= e($device['account']['username'] ?? 'Unknown') ?></a>
+                        <?php else: ?>
+                            Unknown
+                        <?php endif; ?>
+                    </td>
+                    <td><?= badge_html($status) ?></td>
+                    <td><?= e($device['last_ip'] ?? '—') ?></td>
+                    <?php if (admin_has_permission('devices.manage')): ?>
+                    <td class="actions">
+                        <?php if (!$isRevoked): ?>
+                            <form method="post" action="actions.php">
+                                <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                                <input type="hidden" name="action" value="device_revoke">
+                                <input type="hidden" name="id" value="<?= e($device['id']) ?>">
+                                <input type="hidden" name="return_to" value="devices.php">
+                                <button class="button small" type="submit">Revoke</button>
+                            </form>
+                        <?php else: ?>
+                            <form method="post" action="actions.php">
+                                <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                                <input type="hidden" name="action" value="device_restore">
+                                <input type="hidden" name="id" value="<?= e($device['id']) ?>">
+                                <input type="hidden" name="return_to" value="devices.php">
+                                <button class="button small" type="submit">Restore</button>
+                            </form>
+                        <?php endif; ?>
+
+                        <form method="post" action="actions.php" onsubmit="return confirm('Remove this device record? Solis will register it again on the next heartbeat unless it is revoked.');">
+                            <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                            <input type="hidden" name="action" value="device_delete">
+                            <input type="hidden" name="id" value="<?= e($device['id']) ?>">
+                            <input type="hidden" name="return_to" value="devices.php">
+                            <button class="button small danger" type="submit">Remove</button>
+                        </form>
+                    </td>
+                    <?php endif; ?>
+                </tr>
+            <?php endforeach; ?>
+
+            <?php if ($devices === []): ?>
+                <tr><td colspan="<?= admin_has_permission('devices.manage') ? 9 : 8 ?>"><div class="empty-table">No devices have checked in yet. Open Solis while signed in and the installation will appear automatically.</div></td></tr>
+            <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel-header"><div><div class="eyebrow">DATA SOURCE</div><h2>How device detection works</h2></div></div>
+    <div class="panel-body">
+        <p class="muted">Solis generates a stable installation ID under <code>%LocalAppData%\Solis\device-id.txt</code>. After authentication, the desktop app sends the ID, current Solis version, and Windows version to the protected <code>device-heartbeat</code> function every 30 seconds. The server resolves the authenticated Solis account and records the request's observed IP address.</p>
+    </div>
+</section>
+
 <?php require __DIR__ . '/includes/footer.php'; ?>
