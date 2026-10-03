@@ -24,6 +24,7 @@ if (!supabase_is_configured()) {
     try { $subscriptions = get_subscriptions(); } catch (Throwable $e) { $errorMessage ??= $e->getMessage(); }
     try { $devices = get_devices(); } catch (Throwable $e) { $errorMessage ??= $e->getMessage(); }
     try { $logs = get_activity_logs(12); } catch (Throwable $e) { $errorMessage ??= $e->getMessage(); }
+    try { sync_github_releases(); } catch (Throwable $e) { $errorMessage ??= $e->getMessage(); }
     try { $releases = get_releases(); } catch (Throwable $e) { $errorMessage ??= $e->getMessage(); }
 }
 
@@ -79,7 +80,7 @@ require __DIR__ . '/includes/header.php';
     </section>
 
     <section class="panel">
-        <div class="panel-header"><div><div class="eyebrow">SYSTEM</div><h2>Latest release</h2></div><a class="button" href="releases.php">Manage releases</a></div>
+        <div class="panel-header"><div><div class="eyebrow">SYSTEM</div><h2>Latest release</h2></div><a class="button" href="releases.php">View releases</a></div>
         <div class="panel-body">
             <?php if ($publishedRelease): ?>
                 <div class="release-highlight"><div><span class="eyebrow">PUBLISHED</span><strong><?= e($publishedRelease['version']) ?></strong><span><?= e(ucfirst((string) $publishedRelease['channel'])) ?></span></div><?php if (!empty($publishedRelease['download_url'])): ?><a class="button" href="<?= e($publishedRelease['download_url']) ?>" target="_blank" rel="noreferrer">Open release</a><?php endif; ?></div>
