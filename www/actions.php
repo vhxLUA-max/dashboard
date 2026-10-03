@@ -368,48 +368,6 @@ try {
             $returnTo = 'subscriptions.php';
             break;
 
-        case 'device_save':
-            require_permission('devices.manage');
-            $id = post_string('id');
-            $accountId = post_string('account_id');
-            $deviceUid = post_string('device_uid');
-            $deviceName = post_string('device_name');
-            $appVersion = post_string('app_version');
-            $osVersion = post_string('os_version');
-            $lastSeen = normalize_datetime(post_string('last_seen_at'));
-            $notes = post_string('notes');
-
-            if ($accountId === '' || !get_secondary_account($accountId)) {
-                throw new InvalidArgumentException('A valid Solis user is required.');
-            }
-
-            if ($deviceUid === '' || !preg_match('/^[A-Za-z0-9._:-]{3,128}$/', $deviceUid)) {
-                throw new InvalidArgumentException('Device ID must be 3-128 characters.');
-            }
-
-            $data = [
-                'account_id' => $accountId,
-                'device_uid' => $deviceUid,
-                'device_name' => $deviceName !== '' ? $deviceName : null,
-                'app_version' => $appVersion !== '' ? $appVersion : null,
-                'os_version' => $osVersion !== '' ? $osVersion : null,
-                'last_seen_at' => $lastSeen,
-                'notes' => $notes !== '' ? $notes : null,
-                'updated_at' => gmdate('c'),
-            ];
-
-            if ($id === '') {
-                $created = create_device($data);
-                $newId = (string) ($created[0]['id'] ?? '');
-                log_action('device.created', 'device', $newId, ['device_uid' => $deviceUid]);
-                flash('success', 'Device added.');
-            } else {
-                update_device($id, $data);
-                log_action('device.updated', 'device', $id, ['device_uid' => $deviceUid]);
-                flash('success', 'Device updated.');
-            }
-            break;
-
         case 'device_revoke':
             require_permission('devices.manage');
             $id = action_id();
