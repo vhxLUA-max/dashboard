@@ -126,8 +126,6 @@ try {
             $description = post_string('description');
             $interval = post_string('billing_interval', 'month');
             $durationDays = post_string('duration_days');
-            $currency = strtoupper(post_string('currency', 'PHP'));
-            $price = (float) post_string('price', '0');
             $active = post_bool('active');
 
             if (!preg_match('/^[a-z0-9][a-z0-9_-]{1,31}$/', $code)) {
@@ -147,18 +145,12 @@ try {
                 throw new InvalidArgumentException('Duration must be at least 1 day for recurring plans.');
             }
 
-            if ($price < 0) {
-                throw new InvalidArgumentException('Price cannot be negative.');
-            }
-
             $data = [
                 'code' => $code,
                 'name' => $name,
                 'description' => $description !== '' ? $description : null,
                 'billing_interval' => $interval,
                 'duration_days' => $days,
-                'price' => $price,
-                'currency' => $currency !== '' ? $currency : 'PHP',
                 'active' => $active,
                 'updated_at' => gmdate('c'),
             ];
@@ -197,11 +189,6 @@ try {
             $status = post_string('status', 'active');
             $startsAt = normalize_datetime(post_string('starts_at'));
             $expiresAt = normalize_datetime(post_string('expires_at'));
-            $autoRenew = post_bool('auto_renew');
-            $paymentStatus = post_string('payment_status', 'unpaid');
-            $amountPaid = (float) post_string('amount_paid', '0');
-            $paymentReference = post_string('payment_reference');
-            $externalReference = post_string('external_reference');
             $notes = post_string('notes');
 
             if ($accountId === '' || !get_secondary_account($accountId)) {
@@ -212,16 +199,8 @@ try {
                 throw new InvalidArgumentException('Selected plan was not found.');
             }
 
-            if (!in_array($status, ['trialing', 'active', 'past_due', 'canceled', 'expired'], true)) {
+            if (!in_array($status, ['trialing', 'active', 'canceled', 'expired'], true)) {
                 throw new InvalidArgumentException('Invalid subscription status.');
-            }
-
-            if (!in_array($paymentStatus, ['pending', 'paid', 'unpaid', 'refunded'], true)) {
-                throw new InvalidArgumentException('Invalid payment status.');
-            }
-
-            if ($amountPaid < 0) {
-                throw new InvalidArgumentException('Amount paid cannot be negative.');
             }
 
             $existing = $id !== '' ? get_subscription($id) : null;
@@ -235,11 +214,6 @@ try {
                 'status' => $status,
                 'starts_at' => $startsAt ?? gmdate('c'),
                 'expires_at' => $expiresAt,
-                'auto_renew' => $autoRenew,
-                'payment_status' => $paymentStatus,
-                'amount_paid' => $amountPaid,
-                'payment_reference' => $paymentReference !== '' ? $paymentReference : null,
-                'external_reference' => $externalReference !== '' ? $externalReference : null,
                 'notes' => $notes !== '' ? $notes : null,
                 'updated_at' => gmdate('c'),
             ];
@@ -338,7 +312,6 @@ try {
             update_subscription($id, [
                 'status' => 'active',
                 'expires_at' => $newExpiry,
-                'auto_renew' => (bool) ($existing['auto_renew'] ?? false),
                 'updated_at' => gmdate('c'),
             ]);
 
