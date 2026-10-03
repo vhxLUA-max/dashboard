@@ -4,8 +4,8 @@ declare(strict_types=1);
 require __DIR__ . '/includes/auth.php';
 require_login();
 require_permission('logs.view');
-require __DIR__ . '/includes/helpers.php';
-require __DIR__ . '/includes/supabase.php';
+require_once __DIR__ . '/includes/helpers.php';
+require_once __DIR__ . '/includes/supabase.php';
 
 $pageTitle = 'Activity logs';
 $currentPage = 'logs';
