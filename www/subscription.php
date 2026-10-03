@@ -38,14 +38,9 @@ require __DIR__ . '/includes/header.php';
             <input type="hidden" name="return_to" value="<?= e('subscription.php?id=' . $subscription['id']) ?>">
             <label><span>User</span><select name="account_id" required><?php foreach ($accounts as $account): ?><option value="<?= e($account['id']) ?>" <?= (string) $subscription['account_id'] === (string) $account['id'] ? 'selected' : '' ?>><?= e($account['username']) ?></option><?php endforeach; ?></select></label>
             <label><span>Plan</span><select name="plan_id"><option value="">No plan</option><?php foreach ($plans as $plan): ?><option value="<?= e($plan['id']) ?>" <?= (string) ($subscription['plan_id'] ?? '') === (string) $plan['id'] ? 'selected' : '' ?>><?= e($plan['name']) ?></option><?php endforeach; ?></select></label>
-            <label><span>Status</span><select name="status"><?php foreach (['active','trialing','past_due','canceled','expired'] as $status): ?><option value="<?= e($status) ?>" <?= $subscription['status'] === $status ? 'selected' : '' ?>><?= e($status) ?></option><?php endforeach; ?></select></label>
+            <label><span>Status</span><select name="status"><?php foreach (['active','trialing','canceled','expired'] as $status): ?><option value="<?= e($status) ?>" <?= $subscription['status'] === $status ? 'selected' : '' ?>><?= e($status) ?></option><?php endforeach; ?></select></label>
             <label><span>Start</span><input type="datetime-local" name="starts_at" value="<?= e(datetime_local_value($subscription['starts_at'])) ?>"></label>
             <label><span>Expiration</span><input type="datetime-local" name="expires_at" value="<?= e(datetime_local_value($subscription['expires_at'])) ?>"></label>
-            <label><span>Payment status</span><select name="payment_status"><?php foreach (['unpaid','pending','paid','refunded'] as $status): ?><option value="<?= e($status) ?>" <?= $subscription['payment_status'] === $status ? 'selected' : '' ?>><?= e($status) ?></option><?php endforeach; ?></select></label>
-            <label><span>Amount paid</span><input type="number" name="amount_paid" min="0" step="0.01" value="<?= e($subscription['amount_paid']) ?>"></label>
-            <label class="checkbox-row"><input type="checkbox" name="auto_renew" value="1" <?= $subscription['auto_renew'] ? 'checked' : '' ?>><span>Auto renew</span></label>
-            <label><span>Payment reference</span><input type="text" name="payment_reference" value="<?= e($subscription['payment_reference']) ?>"></label>
-            <label><span>External reference</span><input type="text" name="external_reference" value="<?= e($subscription['external_reference']) ?>"></label>
             <label class="full"><span>Notes</span><textarea name="notes" rows="4"><?= e($subscription['notes']) ?></textarea></label>
             <div class="form-actions full"><button class="button primary" type="submit">Save subscription</button></div>
         </form>
