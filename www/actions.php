@@ -256,7 +256,6 @@ try {
 
             update_subscription($id, [
                 'status' => 'canceled',
-                'auto_renew' => false,
                 'updated_at' => gmdate('c'),
             ]);
 
@@ -449,62 +448,6 @@ try {
             log_action('admin.deleted', 'admin', $id);
             flash('success', 'Admin account deleted.');
             $returnTo = 'permissions.php';
-            break;
-
-        case 'release_save':
-            require_permission('releases.manage');
-            $id = post_string('id');
-            $version = post_string('version');
-            $channel = post_string('channel', 'stable');
-            $status = post_string('status', 'draft');
-            $minimum = post_string('min_supported_version');
-            $releaseDate = normalize_datetime(post_string('release_date'));
-            $downloadUrl = post_string('download_url');
-            $notes = post_string('notes');
-
-            if (!preg_match('/^[0-9A-Za-z][0-9A-Za-z._-]{0,31}$/', $version)) {
-                throw new InvalidArgumentException('Invalid version string.');
-            }
-
-            if (!in_array($channel, ['stable', 'beta', 'nightly'], true) || !in_array($status, ['draft', 'published', 'retired'], true)) {
-                throw new InvalidArgumentException('Invalid release state.');
-            }
-
-            $data = [
-                'version' => $version,
-                'channel' => $channel,
-                'status' => $status,
-                'min_supported_version' => $minimum !== '' ? $minimum : null,
-                'release_date' => $releaseDate,
-                'download_url' => $downloadUrl !== '' ? $downloadUrl : null,
-                'notes' => $notes !== '' ? $notes : null,
-                'updated_at' => gmdate('c'),
-            ];
-
-            if ($id === '') {
-                $created = create_release($data);
-                $newId = (string) ($created[0]['id'] ?? '');
-                log_action('release.created', 'release', $newId, ['version' => $version, 'status' => $status]);
-                flash('success', 'Release added.');
-            } else {
-                update_release($id, $data);
-                log_action('release.updated', 'release', $id, ['version' => $version, 'status' => $status]);
-                flash('success', 'Release updated.');
-            }
-            break;
-
-        case 'release_delete':
-            require_permission('releases.manage');
-            $id = action_id();
-            $release = get_release($id);
-            if (!$release) {
-                throw new RuntimeException('Release not found.');
-            }
-
-            delete_release($id);
-            log_action('release.deleted', 'release', $id, ['version' => $release['version']]);
-            flash('success', 'Release deleted.');
-            $returnTo = 'releases.php';
             break;
 
         case 'settings_save':
