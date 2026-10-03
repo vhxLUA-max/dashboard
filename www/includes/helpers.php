@@ -127,3 +127,9 @@ function safe_return_to(string $value, string $fallback = 'index.php'): string
 
     return $value;
 }
+
+function badge_html(string $text, ?string $status = null): string
+{
+    $status = $status ?? strtolower($text);
+    return '<span class="badge badge-' . e(status_class($status)) . '">' . e(ucwords(str_replace('_', ' ', $text))) . '</span>';
+}
