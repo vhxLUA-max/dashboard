@@ -144,7 +144,7 @@ function queue_provision_request(string $discordUserId): array
 
 function get_subscription_plans(bool $activeOnly = false): array
 {
-    $query = 'select=id,code,name,description,billing_interval,duration_days,price,currency,active,created_at,updated_at&order=price.asc,name.asc';
+    $query = 'select=id,code,name,description,billing_interval,duration_days,active,created_at,updated_at&order=name.asc';
 
     if ($activeOnly) {
         $query .= '&active=eq.true';
@@ -182,7 +182,7 @@ function delete_subscription_plan(string $id): array
 function get_subscriptions(): array
 {
     return supabase_request(
-        'subscriptions?select=id,account_id,plan_id,status,starts_at,expires_at,auto_renew,payment_status,amount_paid,payment_reference,external_reference,notes,created_at,updated_at,account:secondary_accounts(id,username,discord_user_id),plan:subscription_plans(id,code,name,billing_interval,duration_days,price,currency)&order=created_at.desc'
+        'subscriptions?select=id,account_id,plan_id,status,starts_at,expires_at,notes,created_at,updated_at,account:secondary_accounts(id,username,discord_user_id),plan:subscription_plans(id,code,name,billing_interval,duration_days)&order=created_at.desc'
     );
 }
 
@@ -315,32 +315,97 @@ function delete_admin_user(string $id): array
     return supabase_request('admin_users?' . supabase_id_filter('id', $id), 'DELETE', null, ['Prefer: return=representation']);
 }
 
+function github_releases_request(): array
+{
+    global $config;
+
+    $repository = $config['release_repository'];
+
+    if (!preg_match('#^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$#', $repository)) {
+        throw new RuntimeException('Invalid Solis release repository configuration.');
+    }
+
+    $ch = curl_init('https://api.github.com/repos/' . $repository . '/releases?per_page=30');
+
+    if ($ch === false) {
+        throw new RuntimeException('Unable to initialize GitHub release request.');
+    }
+
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => [
+            'Accept: application/vnd.github+json',
+            'User-Agent: Solis-Dashboard',
+        ],
+        CURLOPT_TIMEOUT => 15,
+    ]);
+
+    $response = curl_exec($ch);
+    $status = curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+    $error = curl_error($ch);
+    curl_close($ch);
+
+    if ($response === false) {
+        throw new RuntimeException($error !== '' ? $error : 'GitHub release request failed.');
+    }
+
+    $data = json_decode($response, true);
+
+    if ($status < 200 || $status >= 300 || !is_array($data)) {
+        throw new RuntimeException('GitHub release request failed with HTTP ' . $status . '.');
+    }
+
+    return $data;
+}
+
+function sync_github_releases(): array
+{
+    $githubReleases = github_releases_request();
+    $synced = [];
+
+    foreach ($githubReleases as $release) {
+        if (!is_array($release) || (bool) ($release['draft'] ?? false)) {
+            continue;
+        }
+
+        $tag = trim((string) ($release['tag_name'] ?? ''));
+        $version = ltrim($tag, 'vV');
+
+        if ($version === '' || !preg_match('/^[0-9A-Za-z][0-9A-Za-z._-]{0,31}$/', $version)) {
+            continue;
+        }
+
+        $prerelease = (bool) ($release['prerelease'] ?? false);
+        $channel = $prerelease ? 'beta' : 'stable';
+
+        $synced[] = [
+            'version' => $version,
+            'channel' => $channel,
+            'status' => 'published',
+            'release_date' => $release['published_at'] ?? $release['created_at'] ?? null,
+            'download_url' => $release['html_url'] ?? null,
+            'notes' => $release['body'] ?? null,
+            'updated_at' => gmdate('c'),
+        ];
+    }
+
+    if ($synced !== []) {
+        supabase_request(
+            'app_releases?on_conflict=version',
+            'POST',
+            $synced,
+            ['Prefer: resolution=merge-duplicates,return=minimal']
+        );
+    }
+
+    return $synced;
+}
+
 function get_releases(): array
 {
     return supabase_request(
         'app_releases?select=id,version,channel,status,min_supported_version,release_date,download_url,notes,created_at,updated_at&order=release_date.desc.nullslast,created_at.desc'
     );
-}
-
-function get_release(string $id): ?array
-{
-    $rows = supabase_request('app_releases?select=*&' . supabase_id_filter('id', $id) . '&limit=1');
-    return $rows[0] ?? null;
-}
-
-function create_release(array $data): array
-{
-    return supabase_request('app_releases', 'POST', $data, ['Prefer: return=representation']);
-}
-
-function update_release(string $id, array $data): array
-{
-    return supabase_request('app_releases?' . supabase_id_filter('id', $id), 'PATCH', $data, ['Prefer: return=representation']);
-}
-
-function delete_release(string $id): array
-{
-    return supabase_request('app_releases?' . supabase_id_filter('id', $id), 'DELETE', null, ['Prefer: return=representation']);
 }
 
 function get_settings(): array
