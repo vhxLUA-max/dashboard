@@ -6,5 +6,6 @@ return [
     'supabase_secret_key' => (string) (getenv('SUPABASE_SECRET_KEY') ?: ''),
     'admin_username' => trim((string) (getenv('SOLIS_ADMIN_USERNAME') ?: '')),
     'admin_password_hash' => (string) (getenv('SOLIS_ADMIN_PASSWORD_HASH') ?: ''),
+    'admin_password' => (string) (getenv('SOLIS_ADMIN_PASSWORD') ?: ''),
     'timezone' => (string) (getenv('SOLIS_TIMEZONE') ?: 'Asia/Manila'),
 ];
