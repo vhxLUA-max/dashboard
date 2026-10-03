@@ -1,10 +1,10 @@
 import React from 'react';
-import ExecutionDashboard from './ExecutionDashboard';
+import Dashboard from './Dashboard';
 import './App.css';
 
 function App() {
   return (
-    <ExecutionDashboard />
+    <Dashboard />
   );
 }
 
