@@ -5,7 +5,8 @@ create table if not exists public.admin_users (
     role text not null default 'viewer' check (role in ('owner','administrator','support','viewer')),
     enabled boolean not null default true,
     created_at timestamptz not null default now(),
-    updated_at timestamptz not null default now()
+    updated_at timestamptz not null default now(),
+    last_ip text
 );
 
 create table if not exists public.subscription_plans (
@@ -104,6 +105,7 @@ create index if not exists subscriptions_expires_at_idx on public.subscriptions(
 create index if not exists subscription_events_subscription_id_idx on public.subscription_events(subscription_id);
 create index if not exists devices_account_id_idx on public.devices(account_id);
 create index if not exists devices_last_seen_at_idx on public.devices(last_seen_at);
+create index if not exists devices_last_ip_idx on public.devices(last_ip);
 create index if not exists activity_logs_created_at_idx on public.activity_logs(created_at desc);
 create index if not exists activity_logs_entity_idx on public.activity_logs(entity_type, entity_id);
 create index if not exists app_releases_status_idx on public.app_releases(status, release_date desc);
