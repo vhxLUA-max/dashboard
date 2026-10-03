@@ -245,17 +245,6 @@ function get_device(string $id): ?array
 
     return $rows[0] ?? null;
 }
-
-function create_device(array $data): array
-{
-    return supabase_request('devices', 'POST', $data, ['Prefer: return=representation']);
-}
-
-function update_device(string $id, array $data): array
-{
-    return supabase_request('devices?' . supabase_id_filter('id', $id), 'PATCH', $data, ['Prefer: return=representation']);
-}
-
 function delete_device(string $id): array
 {
     return supabase_request('devices?' . supabase_id_filter('id', $id), 'DELETE', null, ['Prefer: return=representation']);
