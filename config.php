@@ -8,4 +8,5 @@ return [
     'admin_password_hash' => (string) (getenv('SOLIS_ADMIN_PASSWORD_HASH') ?: ''),
     'admin_password' => (string) (getenv('SOLIS_ADMIN_PASSWORD') ?: ''),
     'timezone' => (string) (getenv('SOLIS_TIMEZONE') ?: 'Asia/Manila'),
+    'release_repository' => trim((string) (getenv('SOLIS_RELEASE_REPOSITORY') ?: 'solis-syst/solis-app-updates')),
 ];
