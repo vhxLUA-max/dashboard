@@ -49,4 +49,4 @@ The dashboard schema is recorded in \`database/dashboard-schema.sql\`.
 
 ## Features
 
-Dashboard, users, credential provisioning requests, user enable/disable, subscriptions, subscription plans, manual payment records, devices, activity logs, admin roles, release management, system settings, and health checks.
+Dashboard, users, credential provisioning requests, user enable/disable, access subscriptions and plans, automatic GitHub release synchronization, devices, activity logs, admin roles, system settings, and health checks.
