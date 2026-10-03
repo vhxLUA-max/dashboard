@@ -189,7 +189,7 @@ function get_subscriptions(): array
 function get_subscription(string $id): ?array
 {
     $rows = supabase_request(
-        'subscriptions?select=id,account_id,plan_id,status,starts_at,expires_at,auto_renew,payment_status,amount_paid,payment_reference,external_reference,notes,created_at,updated_at,account:secondary_accounts(id,username,discord_user_id),plan:subscription_plans(id,code,name,billing_interval,duration_days,price,currency)&' .
+        'subscriptions?select=id,account_id,plan_id,status,starts_at,expires_at,notes,created_at,updated_at,account:secondary_accounts(id,username,discord_user_id),plan:subscription_plans(id,code,name,billing_interval,duration_days)&' .
         supabase_id_filter('id', $id) . '&limit=1'
     );
 
