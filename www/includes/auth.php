@@ -121,14 +121,29 @@ function authenticate_admin(string $username, string $password): array
 
     $bootstrapUsername = (string) $config['admin_username'];
     $bootstrapHash = (string) $config['admin_password_hash'];
+    $bootstrapPassword = (string) $config['admin_password'];
 
-    if ($bootstrapUsername !== '' && $bootstrapHash !== '' && hash_equals($bootstrapUsername, $username) && password_verify($password, $bootstrapHash)) {
-        return [
-            'id' => 'bootstrap',
-            'username' => $bootstrapUsername,
-            'role' => 'owner',
-            'bootstrap' => true,
-        ];
+    if ($bootstrapUsername !== '' && hash_equals($bootstrapUsername, $username)) {
+        $validPassword = false;
+
+        if ($bootstrapHash !== '') {
+            $validPassword = password_verify($password, $bootstrapHash);
+        } elseif ($bootstrapPassword !== '') {
+            $validPassword = hash_equals($bootstrapPassword, $password);
+        }
+
+        if ($validPassword) {
+            return [
+                'id' => 'bootstrap',
+                'username' => $bootstrapUsername,
+                'role' => 'owner',
+                'bootstrap' => true,
+            ];
+        }
+
+        if ($bootstrapHash === '' && $bootstrapPassword === '') {
+            throw new RuntimeException('Admin password is not configured. Set SOLIS_ADMIN_PASSWORD_HASH or SOLIS_ADMIN_PASSWORD.');
+        }
     }
 
     if (!supabase_is_configured()) {
